@@ -1,35 +1,48 @@
 <template>
   <div class="wrapper">
-      <draggable class="columns"
-        @start="dragStart"
-        @end="dragEnd"
-        v-bind="{ handle: '.columns-layout-handle', animation: 200 }"
-        v-model="columns"
+    <draggable class="columns"
+      @start="dragStart"
+      @end="dragEnd"
+      v-bind="{ handle: '.columns-layout-handle', animation: '200' }"
+      v-model="columns"
+    >
+      <div
+        class="column"
+        v-for="(column, index) in convertedColumns"
+        :style="{ width: Math.max(Math.min(column.width, column.maxWidth), column.minWidth)+'px' }"
+        :key="column.id"
       >
         <div
-          class="column"
-          :style="{ width: ColumnWidth+'px' }"
-          v-for="(column, index) in convertedColumns"
-          :key="column.id"
+          class="column-inner"
+          :style="{ width: Math.max(Math.min(column.width, column.maxWidth), column.minWidth)+'px' }"
         >
           <components
             :is="column.component"
             :column_id="column.id"
-            :addColumn="addColumn"
+            :columns="columns"
+            :addColumn="ac(column.id)"
             :removeColumn="rc(column.id)"
+            :growColumn="gc(column.id)"
+            :shrinkColumn="sc(column.id)"
+            :clearColumns="clearColumns"
             :forwardPage="fp(column.id)"
             :backPage="bp(column.id)"
             :canBackPage="column.canBackPage"
+            :width="column.width"
             :index="index"
+            :params="column.params"
             :dragging="index===draggingColumnIndex"
           ></components>
         </div>
-      </draggable>
-    </div>
+      </div>
+    </draggable>
   </div>
 </template>
 <script>
+  import nanoid from 'nanoid'
   import draggable from 'vuedraggable'
+
+  const log = ( ...args ) => { if (process.env.NODE_ENV === 'development')console.log(...args) }
   export default {
     props: ["ColumnWidth"],
     name: 'ColumnsLayout',
@@ -44,7 +57,7 @@
     },
     computed: {
       convertedColumns: function () {
-        console.log("CONVERTED!!")
+        log("CONVERTED!!")
         const convertedColumns = this.columns.map((column) => {
           if (!column) throw new Error("Invalid column data: "+column)
           if (!column.history) throw new Error("Column history is required.")
@@ -54,49 +67,110 @@
           convertedColumn.component = this.$columns_layout.pages[convertedColumn.name]
           convertedColumn.id = column.id
           convertedColumn.canBackPage = (column.history.length >= 2)
+          convertedColumn.width = column.width
+          convertedColumn.maxWidth = column.maxWidth
+          convertedColumn.minWidth = column.minWidth
           return convertedColumn
         })
         return convertedColumns
       }
     },
     methods: {
-      getUniqueStr: function () {
-        return new Date().getTime().toString(16) + Math.floor(65536*Math.random()).toString(16) + Math.floor(65536*Math.random()).toString(16)
-      },
-      addColumn (page) {
-        console.log("ADD COLUMN")
+      addColumn (page, options, parentId) {
+        log("ADD COLUMN")
         if (!page) throw new Error("Invalid column data: "+page)
         if (!page.name) throw new Error("Page name is required.")
-        this.columns.push({
-          id: this.getUniqueStr(),
+        const columnId = nanoid()
+
+        // ユニークなカラム
+        const parentColumn = this.columns.find((column) => { return column.id === parentId })
+        if (options && options.unique && parentColumn) {
+          const uniqueColumnId = parentColumn.uniqueKeys[options.unique]
+          if (uniqueColumnId && this.columns.find((column) => { return column.id === uniqueColumnId }) != null) return
+            parentColumn.uniqueKeys[options.unique] = columnId
+        }
+
+        const column = {
+          id: columnId,
+          width: options && options.width ? options.width : 320,
+          minWidth: options && options.minWidth ? options.minWidth : 320,
+          maxWidth: options && options.maxWidth ? options.maxWidth : 640,
+          deltaWidth: options && options.deltaWidth ? options.deltaWidth : 160,
           history: [{
-            name: page.name
-          }]
-        })
+            name: page.name,
+            params: page.params || {}
+          }],
+          parentId: null,
+          children: [],
+          uniqueKeys: {}
+        }
+        if (parentId != undefined) {
+          const parentColumn = this.columns.find((column) => { return column.id === parentId })
+          if (parentColumn != null) {
+            parentColumn.children.push(columnId)
+            column.parentId = parentColumn.id
+          }
+        }
+        this.columns.push(column)
       },
-      removeColumn (id) {
-        console.log("REMOVE COLUMN", id)
+      removeColumn (id, options) {
+        log("REMOVE COLUMN", id)
         if (!id) throw new Error("Id is required: "+id)
+        const column = this.columns.find((column) => { return column.id === id })
+        if (column == null) throw new ReferenceError("Column(id: "+id+") is not found")
+        if (options) {
+          if (options.recursive) {
+            column.children.concat().forEach((childId) => {
+              this.removeColumn(childId, options)
+            })
+          }
+        }
+
+        const parentId = column.parentId
+        if (parentId) {
+          const parentColumn = this.columns.find((column) => { return column.id === parentId })
+          if (parentColumn != null) parentColumn.children.splice(parentColumn.children.indexOf(id), 1)
+        }
         const index = this.columns.findIndex((column) => { return column.id === id })
-        if (index == -1) throw new ReferenceError("Column(id: "+id+") is not found")
         this.columns.splice(index, 1)
       },
-      forwardPage (id, page) {
-        console.log("FORWARD PAGE", id)
+      growColumn (id, options) {
+        log("GROW COLUMN", id)
+        if (!id) throw new Error("Id is required: "+id)
+        const column = this.columns.find((column) => { return column.id === id })
+        if (column == null) throw new ReferenceError("Column(id: "+id+") is not found")
+        if (column.width < column.maxWidth) column.width += column.deltaWidth
+      },
+      shrinkColumn (id, options) {
+        log("SHRINK COLUMN", id)
+        if (!id) throw new Error("Id is required: "+id)
+        const column = this.columns.find((column) => { return column.id === id })
+        if (column == null) throw new ReferenceError("Column(id: "+id+") is not found")
+        if (column.width > column.minWidth) column.width -= column.deltaWidth
+      },
+      clearColumns (options) {
+        log("CLEAR COLUMNS")
+        this.columns = []
+      },
+      forwardPage (id, page, options) {
+        log("FORWARD PAGE", id)
         if (!id) throw new Error("Id is required: "+id)
         const index = this.columns.findIndex((column) => { return column.id === id })
         if (index == -1) throw new ReferenceError("Column(id: "+id+") is not found")
-        if (page.deleteHistory == true) {
-          this.columns[index].history.splice(0)
-        } else if (page.replace == true) {
-          this.columns[index].history.splice(-1)
+        if (options) {
+          if (options.deleteHistory == true) {
+            this.columns[index].history.splice(0)
+          } else if (options.replace == true) {
+            this.columns[index].history.splice(-1)
+          }
         }
         this.columns[index].history.push({
-          name: page.name
+          name: page.name,
+          params: page.params || {}
         })
       },
-      backPage (id) {
-        console.log("BACK PAGE", id)
+      backPage (id, options) {
+        log("BACK PAGE", id)
         if (!id) throw new Error("Id is required: "+id)
         const index = this.columns.findIndex((column) => { return column.id === id })
         if (index == -1) throw new ReferenceError("Column(id: "+id+") is not found")
@@ -104,21 +178,24 @@
           this.columns[index].history.splice(this.columns[index].history.length-1, 1)
         }
       },
-      rc (id) { return (() => this.removeColumn(id)) },
-      fp (id) { return ((page) => this.forwardPage(id, page)) },
-      bp (id) { return (() => this.backPage(id)) },
+      ac (parentId) { return ((page, options) => this.addColumn(page, options, parentId)) },
+      rc (id) { return ((options) => this.removeColumn(id, options)) },
+      gc (id) { return ((options) => this.growColumn(id, options)) },
+      sc (id) { return ((options) => this.shrinkColumn(id, options)) },
+      fp (id) { return ((page, options) => this.forwardPage(id, page, options)) },
+      bp (id) { return ((options) => this.backPage(id, options)) },
       dragStart (e) {
-        console.log("DRAG START", e.oldIndex)
+        log("DRAG START", e.oldIndex)
         this.draggingColumnIndex = e.oldIndex
       },
       dragEnd (e) {
-        console.log("DRAG END")
+        log("DRAG END")
         this.draggingColumnIndex = null
       }
     },
     created () {
-      console.log("this.$columns_layout", this.$columns_layout)
-    }
+      log("this.$columns_layout", this.$columns_layout)
+    },
   }
 </script>
 <style scoped>
@@ -134,6 +211,10 @@
   .column {
     flex-grow: 0;
     flex-shrink: 0;
+    height: 100%;
+  }
+  .column-inner {
+    transition-duration: 200ms;
     height: 100%;
     overflow-y: auto;
   }

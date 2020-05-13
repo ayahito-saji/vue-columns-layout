@@ -64,7 +64,7 @@ mounted () {
 You can use those props in Column Page.
 ```
 export default {
-  props: ["column", "addColumn", "removeColumn", "forwardPage", "backPage", "canBackPage", "dragging", "index"]
+  props: ["column_id", "columns", "addColumn", "removeColumn", "clearColumns", "forwardPage", "backPage", "canBackPage", "dragging", "index"]
 }
 ```
 Column is like browser's tab.
@@ -78,35 +78,62 @@ Type: Function
 
 addColumn is a method add column into columns-layout.
 ```
-this.addColumn({ name: '<<Page Name>>' })
+this.addColumn({ name: '<<Page Name>>' }, options)
 ```
+
+#### Options
+```
+options = {
+  uniqueKey: '<<Unique Key>>' // add unique column with << Unique Key >>
+}
+```
+
 ### removeColumn
 Type: Function
 
 removeColumn is a method remove column calling this method.
 ```
-this.removeColumn()
+this.removeColumn(options)
 ```
+
+#### Options
+```
+options = {
+  recursive: Boolean // delete columns recursively
+}
+```
+
+### clearColumns
+Type: Function
+
+clearColumns is a method to clear all Columns.
+
+```
+this.clearColumns(options)
+```
+#### Options
+```
+options = {
+  // nothing
+}
+```
+
 ### forwardPage
 Type: Function
 
 forwardPage is a method like `location.href`.
 this method make page jump into follow page.
 ```
-this.forwardPage({ name: '<<Page Name>>' })
+this.forwardPage({ name: '<<Page Name>>' }, options)
 ```
 
 #### Options
-replace
 ```
-this.forwardPage({ name: '<<Page Name>>', replace: true })
+options = {
+  replace: Boolean, // forward page without current history
+  deleteHistory: Boolean // forward page without all history
+}
 ```
-
-deleteHistory
-```
-this.forwardPage({ name: '<<Page Name>>', deleteHistory: true })
-```
-
 
 ### backPage
 Type: Function
@@ -115,8 +142,15 @@ backPage is a method like `history.back()`.
 this method make page jump back.
 
 ```
-this.backPage()
+this.backPage(options)
 ```
+#### Options
+```
+options = {
+  // nothing
+}
+```
+
 ### canBackPage
 Type: Boolean
 

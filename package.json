@@ -1,6 +1,6 @@
 {
   "name": "vue-columns-layout",
-  "version": "0.2.1",
+  "version": "0.4.11",
   "main": "./dist/vue-columns-layout.common.js",
   "unpkg": "./dist/vue-columns-layout.umd.min.js",
   "jsdelivr": "./dist/vue-columns-layout.umd.min.js",
@@ -12,10 +12,12 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "build-bundle": "vue-cli-service build --target lib --name vue-columns-layout ./src/lib-main.js"
+    "build-bundle": "vue-cli-service build --target lib --name vue-columns-layout ./src/lib-main.js",
+    "deploy": "vue-cli-service build --target lib --name vue-columns-layout ./src/lib-main.js && npm publish"
   },
   "private": false,
   "dependencies": {
+    "nanoid": "^2.1.11",
     "vuedraggable": "^2.23.2"
   },
   "devDependencies": {

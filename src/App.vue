@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <ColumnsLayout ref="cols" :column-width="240"/>
+    <ColumnsLayout ref="cols"/>
   </div>
 </template>
 
